@@ -8,7 +8,7 @@ import org.apache.spark.sql.connector.write.{BatchWrite, DataWriter, DataWriterF
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 
-import java.sql.{DriverManager, ResultSet}
+import java.sql.{Connection, DriverManager, PreparedStatement, ResultSet, Statement}
 import java.util
 import scala.collection.JavaConverters._
 
@@ -51,6 +51,8 @@ class PostgresScanBuilder(options: CaseInsensitiveStringMap) extends ScanBuilder
 }
 
 class PostgresPartition extends InputPartition
+//case class PostgresPartition2(start: Long, stop: Long) extends InputPartition
+//case class PostgresPartition3(shardNum: Int) extends InputPartition
 
 class PostgresScan(connectionProperties: ConnectionProperties) extends Scan with Batch {
   override def readSchema(): StructType = PostgresTable.schema
@@ -58,21 +60,27 @@ class PostgresScan(connectionProperties: ConnectionProperties) extends Scan with
   override def toBatch: Batch = this
 
   override def planInputPartitions(): Array[InputPartition] = Array(new PostgresPartition)
+//  override def planInputPartitions(): Array[InputPartition] = Array(PostgresPartition2(0, 99), PostgresPartition2(100, 200))
+//  override def planInputPartitions(): Array[InputPartition] = (0 to 2).map(i => PostgresPartition3(i)).toArray
 
   override def createReaderFactory(): PartitionReaderFactory = new PostgresPartitionReaderFactory(connectionProperties)
 }
 
-class PostgresPartitionReaderFactory(connectionProperties: ConnectionProperties)
-  extends PartitionReaderFactory {
+class PostgresPartitionReaderFactory(connectionProperties: ConnectionProperties) extends PartitionReaderFactory {
   override def createReader(partition: InputPartition): PartitionReader[InternalRow] = new PostgresPartitionReader(connectionProperties)
+//  override def createReader(partition: PostgresPartition2): PartitionReader[InternalRow] = new PostgresPartitionReader(connectionProperties, partition.start, partition.stop)
+//  override def createReader(partition: PostgresPartition3): PartitionReader[InternalRow] = new PostgresPartitionReader(connectionProperties, partition.shardNum)
 }
 
 class PostgresPartitionReader(connectionProperties: ConnectionProperties) extends PartitionReader[InternalRow] {
-  private val connection = DriverManager.getConnection(
+//class PostgresPartitionReader(connectionProperties: ConnectionProperties) extends PartitionReader[InternalRow] {
+  private val connection: Connection = DriverManager.getConnection(
     connectionProperties.url, connectionProperties.user, connectionProperties.password
   )
-  private val statement = connection.createStatement()
-  private val resultSet = statement.executeQuery(s"select * from ${connectionProperties.tableName}")
+  private val statement: Statement = connection.createStatement()
+  private val resultSet: ResultSet = statement.executeQuery(s"select * from ${connectionProperties.tableName}")
+  // offset 100 + limit 200
+  //  private val resultSet = statement.executeQuery(s"select * from ${connectionProperties.tableName}")
 
   override def next(): Boolean = resultSet.next()
 
@@ -107,13 +115,13 @@ object WriteSucceeded extends WriterCommitMessage
 
 class PostgresWriter(connectionProperties: ConnectionProperties) extends DataWriter[InternalRow] {
 
-  val connection = DriverManager.getConnection(
+  val connection: Connection = DriverManager.getConnection(
     connectionProperties.url,
     connectionProperties.user,
     connectionProperties.password
   )
   val statement = "insert into users (user_id) values (?)"
-  val preparedStatement = connection.prepareStatement(statement)
+  val preparedStatement: PreparedStatement = connection.prepareStatement(statement)
 
   override def write(record: InternalRow): Unit = {
     val value = record.getLong(0)

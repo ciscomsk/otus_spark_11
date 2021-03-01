@@ -10,9 +10,9 @@ import java.util.Properties
 
 class PostgresqlSpec extends AnyFlatSpec with TestContainerForAll {
 
-  override val containerDef = PostgreSQLContainer.Def()
+  override val containerDef: PostgreSQLContainer.Def = PostgreSQLContainer.Def()
 
-  val testTableName = "users"
+  val testTableName: String = "users"
 
   "PostgreSQL data source" should "read table" in withContainers { postgresServer =>
     val spark = SparkSession
@@ -23,6 +23,7 @@ class PostgresqlSpec extends AnyFlatSpec with TestContainerForAll {
 
     spark
       .read
+      // наш написанный сорс
       .format("org.example.datasource.postgres")
       .option("url", postgresServer.jdbcUrl)
       .option("user", postgresServer.username)
